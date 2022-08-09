@@ -23,11 +23,11 @@ class GPSService {
 private:
 
 	void read_PSRF150(const NMEASentence& nmea);
-	void read_GPGGA	(const NMEASentence& nmea);
-	void read_GPGSA	(const NMEASentence& nmea);
-	void read_GPGSV	(const NMEASentence& nmea);
-	void read_GPRMC	(const NMEASentence& nmea);
-	void read_GPVTG	(const NMEASentence& nmea);
+	void read_xxGGA	(const NMEASentence& nmea);
+	void read_xxGSA	(const NMEASentence& nmea);
+	void read_xxGSV	(const NMEASentence& nmea);
+	void read_xxRMC	(const NMEASentence& nmea);
+	void read_xxVTG	(const NMEASentence& nmea);
 
 public:
 	GPSFix fix;

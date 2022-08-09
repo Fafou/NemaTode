@@ -20,6 +20,10 @@ using namespace std::chrono;
 using namespace nmea;
 
 
+namespace {
+	const auto TalkersId = {"GP", "GA", "GL", "GN"};
+}
+
 // ------ Some helpers ----------
 // Takes the NMEA lat/long format (dddmm.mmmm, [N/S,E/W]) and converts to degrees N,E only
 double convertLatLongToDeg(string llstr, string dir){
@@ -76,21 +80,29 @@ void GPSService::attachToParser(NMEAParser& _parser){
 	_parser.setSentenceHandler("PSRF150", [this](const NMEASentence& nmea){
 		this->read_PSRF150(nmea);
 	});
-	_parser.setSentenceHandler("GPGGA", [this](const NMEASentence& nmea){
-		this->read_GPGGA(nmea);
-	});
-	_parser.setSentenceHandler("GPGSA", [this](const NMEASentence& nmea){
-		this->read_GPGSA(nmea);
-	});
-	_parser.setSentenceHandler("GPGSV", [this](const NMEASentence& nmea){
-		this->read_GPGSV(nmea);
-	});
-	_parser.setSentenceHandler("GPRMC", [this](const NMEASentence& nmea){
-		this->read_GPRMC(nmea);
-	});
-	_parser.setSentenceHandler("GPVTG", [this](const NMEASentence& nmea){
-		this->read_GPVTG(nmea);
-	});
+	for (const auto& talker : TalkersId){
+		std::string sentence{talker};
+		sentence.append("GGA");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxGGA(nmea);
+		});
+		sentence.replace(2, 3, "GSA");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxGSA(nmea);
+		});
+		sentence.replace(2, 3, "GSV");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxGSV(nmea);
+		});
+		sentence.replace(2, 3, "RMC");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxRMC(nmea);
+		});
+		sentence.replace(2, 3, "VTG");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxVTG(nmea);
+		});
+	}
 
 }
 
@@ -103,7 +115,7 @@ void GPSService::read_PSRF150(const NMEASentence& nmea){
 	// Called with checksum 3F (invalid) for GPS turning OFF
 }
 
-void GPSService::read_GPGGA(const NMEASentence& nmea){
+void GPSService::read_xxGGA(const NMEASentence& nmea){
 	/* -- EXAMPLE --
 	$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47
 
@@ -208,7 +220,7 @@ void GPSService::read_GPGGA(const NMEASentence& nmea){
 	}
 }
 
-void GPSService::read_GPGSA(const NMEASentence& nmea){
+void GPSService::read_xxGSA(const NMEASentence& nmea){
 	/*  -- EXAMPLE --
 	$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39
 
@@ -282,7 +294,7 @@ void GPSService::read_GPGSA(const NMEASentence& nmea){
 	}
 }
 
-void GPSService::read_GPGSV(const NMEASentence& nmea){
+void GPSService::read_xxGSV(const NMEASentence& nmea){
 	/*  -- EXAMPLE --
 	$GPGSV,2,1,08,01,40,083,46,02,17,308,41,12,07,344,39,14,22,228,45*75
 
@@ -376,7 +388,7 @@ void GPSService::read_GPGSV(const NMEASentence& nmea){
 	}
 }
 
-void GPSService::read_GPRMC(const NMEASentence& nmea){
+void GPSService::read_xxRMC(const NMEASentence& nmea){
 	/*  -- EXAMPLE ---
 	$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
 	$GPRMC,235957.025,V,,,,,,,070810,,,N*4B
@@ -467,7 +479,7 @@ void GPSService::read_GPRMC(const NMEASentence& nmea){
 	}
 }
 
-void GPSService::read_GPVTG(const NMEASentence& nmea){
+void GPSService::read_xxVTG(const NMEASentence& nmea){
 	/*
 	$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48
 
