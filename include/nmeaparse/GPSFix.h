@@ -161,6 +161,7 @@ namespace nmea {
 		double longitude;		// degrees E
 		double speed;			// km/h
 		double travelAngle;		// degrees true north (0-360)
+		double heading;			// degrees true north (0-360)
 		int32_t trackingSatellites;
 		int32_t visibleSatellites;
 

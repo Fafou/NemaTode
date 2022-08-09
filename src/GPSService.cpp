@@ -102,6 +102,14 @@ void GPSService::attachToParser(NMEAParser& _parser){
 		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
 			this->read_xxVTG(nmea);
 		});
+		sentence.replace(2, 3, "HDT");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxHDT(nmea);
+		});
+		sentence.replace(2, 3, "HDG");
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxHDG(nmea);
+		});
 	}
 
 }
@@ -517,6 +525,87 @@ void GPSService::read_xxVTG(const NMEASentence& nmea){
 	catch (NMEAParseError& ex)
 	{
 		NMEAParseError pe("GPS Data Bad Format [$GPVTG] :: " + ex.message, nmea);
+		throw pe;
+	}
+}
+
+void GPSService::read_xxHDT	(const NMEASentence& nmea){
+	/*
+	$GPHDT,123.456,T*00
+
+	where:
+	HDT      		 Heading from True North
+	[0]	123.456      Heading (degrees)
+	[1]	T     		 T:indicate heading relative to True North
+	[1]	*00          Checksum
+	*/
+	try
+	{
+		if (!nmea.checksumOK()){
+			throw NMEAParseError("Checksum is invalid!");
+		}
+
+		if (nmea.parameters.size() < 2){
+			throw NMEAParseError("GPS data is missing parameters.");
+		}
+
+		// Heading
+		// if empty, is converted to 0
+		this->fix.heading = parseDouble(nmea.parameters[0]);		//km/h
+
+
+		this->onUpdate();
+	}
+	catch (NumberConversionError& ex)
+	{
+		NMEAParseError pe("GPS Number Bad Format [$GPHDT] :: " + ex.message, nmea);
+		throw pe;
+	}
+	catch (NMEAParseError& ex)
+	{
+		NMEAParseError pe("GPS Data Bad Format [$GPHDT] :: " + ex.message, nmea);
+		throw pe;
+	}
+}
+
+void GPSService::read_xxHDG	(const NMEASentence& nmea){
+	/*
+	$GPHDG,123.456,123.456,E,123.456,E*00
+
+	where:
+	HDT      		 Heading from True North
+	[0]	123.456      Magnetic sensor heading (degrees)
+	[1]	123.456      Magnetic Deviation (degrees)
+	[2]	E     		 Magnetic Deviation direction, E = Easterly, W = Westerly
+	[3]	123.456      Magnetic Variation (degrees)
+	[4]	E     		 Magnetic Variation direction, E = Easterly, W = Westerly
+	[4]	*00          Checksum
+	*/
+	try
+	{
+		if (!nmea.checksumOK()){
+			throw NMEAParseError("Checksum is invalid!");
+		}
+
+		if (nmea.parameters.size() < 5){
+			throw NMEAParseError("GPS data is missing parameters.");
+		}
+
+		// Heading
+		// if empty, is converted to 0
+		this->fix.heading = parseDouble(nmea.parameters[0]);		//km/h
+
+
+		this->onUpdate();
+	}
+	catch (NumberConversionError& ex)
+	{
+		NMEAParseError pe("GPS Number Bad Format [$GPHDG] :: " + ex.message, nmea);
+		throw pe;
+	}
+	catch (NMEAParseError& ex)
+	{
+		NMEAParseError pe("GPS Data Bad Format [$GPHDG] :: " + ex.message, nmea);
 		throw pe;
 	}
 }
