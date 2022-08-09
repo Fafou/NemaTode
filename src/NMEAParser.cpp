@@ -76,7 +76,7 @@ bool hasNonAlphaNum(string txt){
 bool validParamChars(string txt){
 	for (const char i : txt){
 		if (!isalnum(i)){
-			if (i != '-' && i != '.'){
+			if (i != '-' && i != '.' && i != '+'){
 				return false;
 			}
 		}
