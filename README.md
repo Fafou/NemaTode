@@ -41,13 +41,13 @@ This is all you need to use the GPS NMEA sentence data.
       
 
 ----
-##Features
+## Features
 
 * **NMEA Parsing** of standard and custom sentences.
 
   - Standard:
 ```` 
-    GPGGA, GPGSA, GPGSV, GPRMC, GPVTG, GPHDV, GPHDG
+    GPGGA, GPGSA, GPGSV, GPRMC, GPVTG, GPHDT, GPHDG, PSSN_HRP
 ````
 
 * **NMEA Generation** of "standard" and custom sentences.

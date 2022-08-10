@@ -17,6 +17,7 @@
 #include <vector>
 #include <cmath>
 #include <sstream>
+#include <optional>
 
 namespace nmea {
 
@@ -117,33 +118,47 @@ namespace nmea {
 	};
 
 
+	// =========================== Attitude data =====================================
+	class GPSAttitude {
 
+	public:
+		std::string toString();
+
+		GPSTimestamp timestamp;
+		double heading{0.};			// degrees true north (0-360)
+		double roll{0.};			// degrees
+		double pitch{0.};			// degrees
+		double headingDeviation{0.};// degrees
+		double rollDeviation{0.};	// degrees
+		double pitchDeviation{0.};	// degrees
+		int32_t sattelitesCount{0};	// Number of satellites used for attitude computation
+		int8_t modeIndicator{0};	// Mode indicator:
+					 					// 0: No attitude available
+					 					// 1: Heading, Pitch with float ambiguities
+					 					// 2: Heading, Pitch with fixed ambiguities
+					 					// 3: Heading, Pitch, Roll with float ambiguities
+					 					// 4: Heading, Pitch, Roll with fixed ambiguities
+					 					// 5: Heading, Pitch from velocity (dead-reckoning)
+					 					// 6: Heading, Pitch, Roll from non-RTK INS
+					 					// 7: Heading, Pitch, Roll from RTK INS
+					 					// 8: Heading, Pitch, Roll from INS coasting
+		double magneticVariation{0.};// degree
+		char magnetVarDirection{'E'};// E=East, W=West
+	};
 
 
 
 	// =========================== GPS FIX =====================================
 
-	class GPSFix {
-		friend GPSService;
+	class GPSFixData {
 
 	private:
 
-		bool haslock;
-		bool setlock(bool b);		//returns true if lock status **changed***, false otherwise.
-
+		bool haslock{false};
 
 	public:
-
-		GPSFix();
-		virtual ~GPSFix();
-
-
-		GPSAlmanac almanac;
 		GPSTimestamp timestamp;
-
-		char status;		// Status: A=active, V=void (not locked)
-		uint8_t type;		// Type: 1=none, 2=2d, 3=3d
-		uint8_t quality;	// Quality: 
+		uint8_t quality{0};	// Quality: 
 							//    0 = invalid
 							//    1 = GPS fix (SPS)
 							//    2 = DGPS fix
@@ -151,26 +166,42 @@ namespace nmea {
 							//    4 = Real Time Kinematic (RTK)
 							//    5 = Float RTK
 							//    6 = estimated (dead reckoning) (2.3 feature)
-
-		double dilution;					// Combination of Vertical & Horizontal
-		double horizontalDilution;			// Horizontal dilution of precision, initialized to 100, best =1, worst = >20
-		double verticalDilution;			// Vertical is less accurate
-
-		double altitude;		// meters
-		double latitude;		// degrees N
-		double longitude;		// degrees E
-		double speed;			// km/h
-		double travelAngle;		// degrees true north (0-360)
-		double heading;			// degrees true north (0-360)
-		int32_t trackingSatellites;
-		int32_t visibleSatellites;
+		double altitude{0.};		// meters
+		double latitude{0.};		// degrees N
+		double longitude{0.};		// degrees E
+		int32_t trackingSatellites{0};
 
 		bool locked();
+		bool setlock(bool locked);		//returns true if lock status **changed***, false otherwise.
+		bool hasEstimate();
+
+		std::chrono::seconds timeSinceLastUpdate();	// Returns seconds difference from last timestamp and right now.
+		std::string toString(const std::string& header);
+	};
+
+	class GPSFix {
+		friend GPSService;
+
+	public:
+		GPSFixData main;
+		std::optional<GPSFixData> aux;
+
+		GPSAlmanac almanac;
+
+		char status{'V'};		// Status: A=active, V=void (not locked)
+		uint8_t type{1};		// Type: 1=none, 2=2d, 3=3d
+
+		double dilution{0.};					// Combination of Vertical & Horizontal
+		double horizontalDilution{0.};			// Horizontal dilution of precision, initialized to 100, best =1, worst = >20
+		double verticalDilution{0.};			// Vertical is less accurate
+
+		double speed{0.};			// km/h
+		double travelAngle{0.};		// degrees true north (0-360)
+		GPSAttitude attitude;
+		int32_t visibleSatellites{0};
+
 		double horizontalAccuracy();
 		double verticalAccuracy();
-		bool hasEstimate();
-		
-		std::chrono::seconds timeSinceLastUpdate();	// Returns seconds difference from last timestamp and right now.
 
 		std::string toString();
 		operator std::string();

@@ -39,7 +39,7 @@ int main(int argc, char** argv){
 
 	// Handle any changes to the GPS Fix... This is called after onSentence
 	gps.onUpdate += [&gps](){
-		cout << "\t\t\tPosition: " << gps.fix.latitude << "'N, " << gps.fix.longitude << "'E" << endl << endl;
+		cout << "\t\t\tPosition: " << gps.fix.main.latitude << "'N, " << gps.fix.main.longitude << "'E" << endl << endl;
 	};
 
 	// (optional) - Handle events when the parser receives each sentence

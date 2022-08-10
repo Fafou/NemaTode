@@ -84,7 +84,10 @@ void GPSService::attachToParser(NMEAParser& _parser){
 		std::string sentence{talker};
 		sentence.append("GGA");
 		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
-			this->read_xxGGA(nmea);
+			this->read_xxGGA(nmea, this->fix.main);
+		});
+		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
+			this->read_xxGGA(nmea, this->fix.aux ? *(this->fix.aux) : this->fix.aux.emplace());
 		});
 		sentence.replace(2, 3, "GSA");
 		_parser.setSentenceHandler(sentence, [this](const NMEASentence& nmea){
@@ -111,7 +114,9 @@ void GPSService::attachToParser(NMEAParser& _parser){
 			this->read_xxHDG(nmea);
 		});
 	}
-
+	_parser.setSentenceHandler("PSSN", [this](const NMEASentence& nmea){
+		this->read_PSSN(nmea);
+	});
 }
 
 
@@ -123,7 +128,7 @@ void GPSService::read_PSRF150(const NMEASentence& nmea){
 	// Called with checksum 3F (invalid) for GPS turning OFF
 }
 
-void GPSService::read_xxGGA(const NMEASentence& nmea){
+void GPSService::read_xxGGA(const NMEASentence& nmea, GPSFixData& data){
 	/* -- EXAMPLE --
 	$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47
 
@@ -165,7 +170,7 @@ void GPSService::read_xxGGA(const NMEASentence& nmea){
 
 
 		// TIMESTAMP
-		this->fix.timestamp.setTime(parseDouble(nmea.parameters[0]));
+		data.timestamp.setTime(parseDouble(nmea.parameters[0]));
 
 		string sll;
 		string dir;
@@ -173,38 +178,35 @@ void GPSService::read_xxGGA(const NMEASentence& nmea){
 		sll = nmea.parameters[1];
 		dir = nmea.parameters[2];
 		if (!sll.empty()){
-			this->fix.latitude = convertLatLongToDeg(sll, dir);
+			data.latitude = convertLatLongToDeg(sll, dir);
 		}
 
 		// LONG
 		sll = nmea.parameters[3];
 		dir = nmea.parameters[4];
 		if (!sll.empty()){
-			this->fix.longitude = convertLatLongToDeg(sll, dir);
+			data.longitude = convertLatLongToDeg(sll, dir);
 		}
 
 
 		// FIX QUALITY
 		bool lockupdate = false;
-		this->fix.quality = (uint8_t)parseInt(nmea.parameters[5]);
-		if (this->fix.quality == 0){
-			lockupdate = this->fix.setlock(false);
+		data.quality = (uint8_t)parseInt(nmea.parameters[5]);
+		if (data.quality == 0){
+			lockupdate = data.setlock(false);
 		}
-		else if (this->fix.quality == 1){
-			lockupdate = this->fix.setlock(true);
+		else if (data.quality == 1){
+			lockupdate = data.setlock(true);
 		}
 		else {}
 
 
 		// TRACKING SATELLITES
-		this->fix.trackingSatellites = (int32_t)parseInt(nmea.parameters[6]);
-		if (this->fix.visibleSatellites < this->fix.trackingSatellites){
-			this->fix.visibleSatellites = this->fix.trackingSatellites;		// the visible count is in another sentence.
-		}
+		data.trackingSatellites = (int32_t)parseInt(nmea.parameters[6]);
 
 		// ALTITUDE
 		if (!nmea.parameters[8].empty()){
-			this->fix.altitude = parseDouble(nmea.parameters[8]);
+			data.altitude = parseDouble(nmea.parameters[8]);
 		}
 		else {
 			// leave old value
@@ -212,7 +214,7 @@ void GPSService::read_xxGGA(const NMEASentence& nmea){
 
 		//calling handlers
 		if (lockupdate){
-			this->onLockStateChanged(this->fix.haslock);
+			this->onLockStateChanged(data.locked());
 		}
 		this->onUpdate();
 	}
@@ -264,10 +266,10 @@ void GPSService::read_xxGSA(const NMEASentence& nmea){
 		uint64_t fixtype = parseInt(nmea.parameters[1]);
 		this->fix.type = (int8_t)fixtype;
 		if (fixtype == 1){
-			lockupdate = this->fix.setlock(false);
+			lockupdate = this->fix.main.setlock(false);
 		}
 		else if (fixtype == 3) {
-			lockupdate = this->fix.setlock(true);
+			lockupdate = this->fix.main.setlock(true);
 		}
 		else {}
 
@@ -286,7 +288,7 @@ void GPSService::read_xxGSA(const NMEASentence& nmea){
 
 		//calling handlers
 		if (lockupdate){
-			this->onLockStateChanged(this->fix.haslock);
+			this->onLockStateChanged(this->fix.main.locked());
 		}
 		this->onUpdate();
 	}
@@ -338,7 +340,7 @@ void GPSService::read_xxGSV(const NMEASentence& nmea){
 
 		// VISIBLE SATELLITES
 		this->fix.visibleSatellites = (int32_t)parseInt(nmea.parameters[2]);
-		if (this->fix.trackingSatellites == 0){
+		if (this->fix.main.trackingSatellites == 0){
 			this->fix.visibleSatellites = 0;			// if no satellites are tracking, then none are visible!
 		}												// Also NMEA defaults to 12 visible when chip powers on. Obviously not right.
 
@@ -427,7 +429,7 @@ void GPSService::read_xxRMC(const NMEASentence& nmea){
 		}
 
 		// TIMESTAMP
-		this->fix.timestamp.setTime(parseDouble(nmea.parameters[0]));
+		this->fix.main.timestamp.setTime(parseDouble(nmea.parameters[0]));
 
 		string sll;
 		string dir;
@@ -435,14 +437,14 @@ void GPSService::read_xxRMC(const NMEASentence& nmea){
 		sll = nmea.parameters[2];
 		dir = nmea.parameters[3];
 		if (!sll.empty()){
-			this->fix.latitude = convertLatLongToDeg(sll, dir);
+			this->fix.main.latitude = convertLatLongToDeg(sll, dir);
 		}
 
 		// LONG
 		sll = nmea.parameters[4];
 		dir = nmea.parameters[5];
 		if (!sll.empty()){
-			this->fix.longitude = convertLatLongToDeg(sll, dir);
+			this->fix.main.longitude = convertLatLongToDeg(sll, dir);
 		}
 
 
@@ -454,24 +456,24 @@ void GPSService::read_xxRMC(const NMEASentence& nmea){
 		}
 		this->fix.status = status;
 		if (status == 'V'){
-			lockupdate = this->fix.setlock(false);
+			lockupdate = this->fix.main.setlock(false);
 		}
 		else if (status == 'A') {
-			lockupdate = this->fix.setlock(true);
+			lockupdate = this->fix.main.setlock(true);
 		}
 		else {
-			lockupdate = this->fix.setlock(false);		//not A or V, so must be wrong... no lock
+			lockupdate = this->fix.main.setlock(false);		//not A or V, so must be wrong... no lock
 		}
 
 
 		this->fix.speed = convertKnotsToKilometersPerHour(parseDouble(nmea.parameters[6]));		// received as knots, convert to km/h
 		this->fix.travelAngle = parseDouble(nmea.parameters[7]);
-		this->fix.timestamp.setDate((int32_t)parseInt(nmea.parameters[8]));
+		this->fix.main.timestamp.setDate((int32_t)parseInt(nmea.parameters[8]));
 
 
 		//calling handlers
 		if (lockupdate){
-			this->onLockStateChanged(this->fix.haslock);
+			this->onLockStateChanged(this->fix.main.locked());
 		}
 		this->onUpdate();
 	}
@@ -551,7 +553,7 @@ void GPSService::read_xxHDT	(const NMEASentence& nmea){
 
 		// Heading
 		// if empty, is converted to 0
-		this->fix.heading = parseDouble(nmea.parameters[0]);		//km/h
+		this->fix.attitude.heading = parseDouble(nmea.parameters[0]);		//degree
 
 
 		this->onUpdate();
@@ -593,8 +595,113 @@ void GPSService::read_xxHDG	(const NMEASentence& nmea){
 
 		// Heading
 		// if empty, is converted to 0
-		this->fix.heading = parseDouble(nmea.parameters[0]);		//km/h
+		this->fix.attitude.heading = parseDouble(nmea.parameters[0]);		// degree
 
+
+		this->onUpdate();
+	}
+	catch (NumberConversionError& ex)
+	{
+		NMEAParseError pe("GPS Number Bad Format [$GPHDG] :: " + ex.message, nmea);
+		throw pe;
+	}
+	catch (NMEAParseError& ex)
+	{
+		NMEAParseError pe("GPS Data Bad Format [$GPHDG] :: " + ex.message, nmea);
+		throw pe;
+	}
+}
+
+void GPSService::read_PSSN (const NMEASentence& nmea){
+	/*
+	$PSSN,*
+
+	where:
+	PSSN      		Proprietary Septentrio NMEA Sentences
+	*/
+	try
+	{
+		if (!nmea.checksumOK()){
+			throw NMEAParseError("Checksum is invalid!");
+		}
+
+		if (nmea.parameters.size() < 2){
+			throw NMEAParseError("GPS data is missing parameters.");
+		}
+
+		if (nmea.parameters[1] == "HRP") {
+			this->read_PSSN_HRP(nmea);
+		} else {
+			throw NMEAParseError("Invalid custom sentence.");
+		}
+	}
+	catch (NumberConversionError& ex)
+	{
+		NMEAParseError pe("GPS Number Bad Format [$GPHDG] :: " + ex.message, nmea);
+		throw pe;
+	}
+	catch (NMEAParseError& ex)
+	{
+		NMEAParseError pe("GPS Data Bad Format [$GPHDG] :: " + ex.message, nmea);
+		throw pe;
+	}
+}
+
+void GPSService::read_PSSN_HRP	(const NMEASentence& nmea){
+	/*
+	$PSSN,HRP,120010.10,080822,12.3,45.6,78.9,12.3,45.6,78.9,10,0,12.3,E*42
+
+	where:
+	PSSN      		Proprietary Septentrio NMEA Sentences
+	[0]	HRP		    Heading, Roll, Pitch
+	[1]	120010.10   UTC of HRP (HoursMinutesSeconds.DecimalSeconds)
+	[2]	080822 		Date: ddmmyy
+	[3]	12.3     	Heading, degrees True
+	[4]	45.6     	Roll, degrees
+	[5] 78.9		Pitch, degrees
+	[6]	12.3     	Heading standard deviation, degrees
+	[7]	45.6     	Roll standard deviation, degrees
+	[8] 78.9		Pitch standard deviation, degrees
+	[9] 10			Number of satellites used for attitude computation
+	[10] 0			Mode indicator:
+					 	0: No attitude available
+					 	1: Heading, Pitch with float ambiguities
+					 	2: Heading, Pitch with fixed ambiguities
+					 	3: Heading, Pitch, Roll with float ambiguities
+					 	4: Heading, Pitch, Roll with fixed ambiguities
+					 	5: Heading, Pitch from velocity (dead-reckoning)
+					 	6: Heading, Pitch, Roll from non-RTK INS
+					 	7: Heading, Pitch, Roll from RTK INS
+					 	8: Heading, Pitch, Roll from INS coasting
+	[11-12] 12.3,E	Magnetic variation, degrees (E=East, W=West)
+	[12]	*00     Checksum
+	*/
+	try
+	{
+		if (!nmea.checksumOK()){
+			throw NMEAParseError("Checksum is invalid!");
+		}
+
+		if (nmea.parameters.size() < 13){
+			throw NMEAParseError("GPS data is missing parameters.");
+		}
+
+		this->fix.attitude.timestamp.setTime(parseDouble(nmea.parameters[1]));
+		this->fix.attitude.timestamp.setDate((int32_t)parseInt(nmea.parameters[2]));
+		this->fix.attitude.heading = parseDouble(nmea.parameters[3]);
+		this->fix.attitude.roll = parseDouble(nmea.parameters[4]);
+		this->fix.attitude.pitch = parseDouble(nmea.parameters[5]);
+		this->fix.attitude.headingDeviation = parseDouble(nmea.parameters[6]);
+		this->fix.attitude.rollDeviation = parseDouble(nmea.parameters[7]);
+		this->fix.attitude.pitchDeviation = parseDouble(nmea.parameters[8]);
+		this->fix.attitude.sattelitesCount = (int32_t)parseInt(nmea.parameters[9]);
+		this->fix.attitude.modeIndicator = (int8_t)parseInt(nmea.parameters[10]);
+		this->fix.attitude.magneticVariation = parseDouble(nmea.parameters[11]);
+		char direction = 'E';
+		if (!nmea.parameters[12].empty() && nmea.parameters[12][0] == 'W'){
+			direction = 'W';
+		}
+		this->fix.attitude.magnetVarDirection = direction;
 
 		this->onUpdate();
 	}
