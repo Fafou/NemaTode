@@ -629,20 +629,21 @@ void GPSService::read_PSSN (const NMEASentence& nmea){
 			throw NMEAParseError("GPS data is missing parameters.");
 		}
 
-		if (nmea.parameters[1] == "HRP") {
+		if (nmea.parameters[0] == "HRP") {
+			const_cast<NMEASentence&>(nmea).name.append("," + nmea.parameters[0]);
 			this->read_PSSN_HRP(nmea);
 		} else {
-			throw NMEAParseError("Invalid custom sentence.");
+			throw NMEAParseError("Invalid custom sentence: " + nmea.parameters[0]);
 		}
 	}
 	catch (NumberConversionError& ex)
 	{
-		NMEAParseError pe("GPS Number Bad Format [$GPHDG] :: " + ex.message, nmea);
+		NMEAParseError pe("GPS Number Bad Format [$PSSN] : " + ex.message, nmea);
 		throw pe;
 	}
 	catch (NMEAParseError& ex)
 	{
-		NMEAParseError pe("GPS Data Bad Format [$GPHDG] :: " + ex.message, nmea);
+		NMEAParseError pe("GPS Data Bad Format [$PSSN] : " + ex.message, nmea);
 		throw pe;
 	}
 }

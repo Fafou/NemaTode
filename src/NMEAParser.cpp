@@ -155,11 +155,18 @@ void NMEAParser::readByte(uint8_t b){
 				buffer.clear();
 				fillingbuffer = false;
 			}
-			catch (exception&){
+			catch (NMEAParseError& error){
 				// If anything happens, let it pass through, but reset the buffer first.
 				buffer.clear();
 				fillingbuffer = false;
-				throw;
+				NMEAParseError pe(error.what());
+				throw pe;
+			}
+			catch (exception& e){
+				// If anything happens, let it pass through, but reset the buffer first.
+				buffer.clear();
+				fillingbuffer = false;
+				throw e;
 			}
 		}
 		else{
@@ -252,8 +259,9 @@ void NMEAParser::readSentence(std::string cmd){
 	try{
 		parseText(nmea, cmd);
 	}
-	catch (NMEAParseError&){
-		throw;
+	catch (NMEAParseError& error){
+		NMEAParseError pe(error.what());
+		throw pe;
 	}
 	catch (std::exception& e){
 		string s = " >> NMEA Parser Internal Error: Indexing error?... ";
