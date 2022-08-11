@@ -258,41 +258,8 @@ std::string GPSAttitude::toString() {
 // ======================== GPS FIX ====================
 // =====================================================
 
-std::string fixQualityToString(uint8_t quality){
-	switch (quality){
-	case 0:
-		return "Invalid";
-	case 1:
-		return "Standard";
-	case 2:
-		return "DGPS";
-	case 3:
-		return "PPS fix";
-	case 4:
-		return "Real Time Kinetic";
-	case 5:
-		return "Real Time Kinetic (float)";
-	case 6:
-		return "Estimate";
-	default:
-		return "Unknown";
-	}
-}
-
-bool GPSFixData::locked() {
-	return haslock;
-}
-
-bool GPSFixData::setlock(bool locked) {
-	if (haslock != locked){
-		haslock = locked;
-		return true;
-	}
-	return false;
-}
-
 // Returns the duration since the Host has received information
-seconds GPSFixData::timeSinceLastUpdate(){
+seconds GPSFix::timeSinceLastUpdate(){
 	time_t now = time(NULL);
 	struct tm stamp = { 0 };
 
@@ -308,29 +275,22 @@ seconds GPSFixData::timeSinceLastUpdate(){
 	return seconds((uint64_t)secs);
 }
 
-std::string GPSFixData::toString(const std::string& header) {
-	stringstream ss;
-	ios_base::fmtflags oldflags = ss.flags();
-
-	ss << "--><> GPS " << header << endl
-		<< " Status: \t\t" << ((haslock) ? "LOCK!" : "SEARCHING...") << endl
-		<< " Satellites: \t\t" << trackingSatellites << " (tracking) "<< endl
-		<< " < Fix Details >" << endl
-		<< "   Age:                " << timeSinceLastUpdate().count() << " s" << endl
-		<< "   Timestamp:          " << timestamp.toString() << "   UTC   \n\t\t\t(raw: " << timestamp.rawTime << " time, " << timestamp.rawDate << " date)" << endl
-		<< "   Quality:            " << (int)quality	<< "  (" << fixQualityToString(quality) << ")" << endl
-		<< "   Lat/Lon (N,E):      " << setprecision(6) << fixed << latitude << "' N, " << longitude << "' E" <<  endl;
-
-	ss.flags(oldflags);  //reset
-
-	ss << "   Altitude:           " << altitude << " m" << endl;
-
-	return ss.str();
-}
-
-bool GPSFixData::hasEstimate(){
+bool GPSFix::hasEstimate(){
 	return (latitude != 0 && longitude != 0) || (quality == 6);
 }
+
+bool GPSFix::setlock(bool locked){
+	if (haslock != locked){
+		haslock = locked;
+		return true;
+	}
+	return false;
+}
+
+bool GPSFix::locked(){
+	return haslock;
+}
+
 
 // Returns meters
 double GPSFix::horizontalAccuracy(){
@@ -385,7 +345,6 @@ std::string GPSFix::travelAngleToCompassDirection(double deg, bool abbrev){
 	
 };
 
-
 std::string fixStatusToString(char status){
 	switch (status){
 	case 'A':
@@ -396,6 +355,7 @@ std::string fixStatusToString(char status){
 		return "Unknown";
 	}
 }
+
 std::string fixTypeToString(uint8_t type){
 	switch (type){
 	case 1:
@@ -409,24 +369,49 @@ std::string fixTypeToString(uint8_t type){
 	}
 }
 
+std::string fixQualityToString(uint8_t quality){
+	switch (quality){
+	case 0:
+		return "Invalid";
+	case 1:
+		return "Standard";
+	case 2:
+		return "DGPS";
+	case 3:
+		return "PPS fix";
+	case 4:
+		return "Real Time Kinetic";
+	case 5:
+		return "Real Time Kinetic (float)";
+	case 6:
+		return "Estimate";
+	default:
+		return "Unknown";
+	}
+}
+
 std::string GPSFix::toString(){
 	stringstream ss;
 	ios_base::fmtflags oldflags = ss.flags();
 
 	ss << "========================== GPS FIX ================================" << endl
-		<< main.toString("main")
-		<< (aux ? aux->toString("aux") : "")
-		<< " Satellites: \t\t" << visibleSatellites << " (visible)" << endl
+		<< " Status: \t\t" << ((haslock) ? "LOCK!" : "SEARCHING...") << endl
+		<< " Satellites: \t\t" << trackingSatellites << " (tracking) of " << visibleSatellites << " (visible)" << endl
 		<< " < Fix Details >" << endl
+		<< "   Age:                " << timeSinceLastUpdate().count() << " s" << endl
+		<< "   Timestamp:          " << timestamp.toString() << "   UTC   \n\t\t\t(raw: " << timestamp.rawTime << " time, " << timestamp.rawDate << " date)" << endl
 		<< "   Raw Status:         " << status			<< "  (" << fixStatusToString(status) << ")" << endl
-		<< "   Type:               " << (int)type		<< "  (" << fixTypeToString(type) << ")" << endl;
+		<< "   Type:               " << (int)type		<< "  (" << fixTypeToString(type) << ")" << endl
+		<< "   Quality:            " << (int)quality	<< "  (" << fixQualityToString(quality) << ")" << endl
+		<< "   Lat/Lon (N,E):      " << setprecision(6) << fixed << latitude << "' N, " << longitude << "' E" <<  endl;
 
 	ss.flags(oldflags);  //reset
 
 	ss << "   DOP (P,H,V):        " << dilution << ",   " << horizontalDilution << ",   " << verticalDilution << endl
 		<< "   Accuracy(H,V):      " << horizontalAccuracy() << " m,   " << verticalAccuracy() << " m" << endl;
 
-	ss << "   Speed:              " << speed << " km/h" << endl
+	ss << "   Altitude:           " << altitude << " m" << endl
+		<< "   Speed:              " << speed << " km/h" << endl
 		<< "   Travel Dir:         " << travelAngle << " deg  [" << travelAngleToCompassDirection(travelAngle) << "]" << endl
 		<< "   SNR:                avg: " << almanac.averageSNR() << " dB   [min: " << almanac.minSNR() << " dB,  max:" << almanac.maxSNR() << " dB]" << endl;
 	ss << "   Attitude:" << endl
@@ -442,6 +427,7 @@ std::string GPSFix::toString(){
 
 	return ss.str();
 }
+
 GPSFix::operator std::string(){
 	return toString();
 }

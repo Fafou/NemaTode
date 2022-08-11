@@ -17,7 +17,6 @@
 #include <vector>
 #include <cmath>
 #include <sstream>
-#include <optional>
 
 namespace nmea {
 
@@ -150,14 +149,20 @@ namespace nmea {
 
 	// =========================== GPS FIX =====================================
 
-	class GPSFixData {
-
+	class GPSFix {
+		friend GPSService;
+		
 	private:
 
-		bool haslock{false};
+		bool haslock;
+		bool setlock(bool b);		//returns true if lock status **changed***, false otherwise.
 
 	public:
+		GPSAlmanac almanac;
 		GPSTimestamp timestamp;
+
+		char status{'V'};		// Status: A=active, V=void (not locked)
+		uint8_t type{1};		// Type: 1=none, 2=2d, 3=3d
 		uint8_t quality{0};	// Quality: 
 							//    0 = invalid
 							//    1 = GPS fix (SPS)
@@ -166,42 +171,26 @@ namespace nmea {
 							//    4 = Real Time Kinematic (RTK)
 							//    5 = Float RTK
 							//    6 = estimated (dead reckoning) (2.3 feature)
-		double altitude{0.};		// meters
-		double latitude{0.};		// degrees N
-		double longitude{0.};		// degrees E
-		int32_t trackingSatellites{0};
-
-		bool locked();
-		bool setlock(bool locked);		//returns true if lock status **changed***, false otherwise.
-		bool hasEstimate();
-
-		std::chrono::seconds timeSinceLastUpdate();	// Returns seconds difference from last timestamp and right now.
-		std::string toString(const std::string& header);
-	};
-
-	class GPSFix {
-		friend GPSService;
-
-	public:
-		GPSFixData main;
-		std::optional<GPSFixData> aux;
-
-		GPSAlmanac almanac;
-
-		char status{'V'};		// Status: A=active, V=void (not locked)
-		uint8_t type{1};		// Type: 1=none, 2=2d, 3=3d
 
 		double dilution{0.};					// Combination of Vertical & Horizontal
 		double horizontalDilution{0.};			// Horizontal dilution of precision, initialized to 100, best =1, worst = >20
 		double verticalDilution{0.};			// Vertical is less accurate
 
+		double altitude{0.};		// meters
+		double latitude{0.};		// degrees N
+		double longitude{0.};		// degrees E
 		double speed{0.};			// km/h
 		double travelAngle{0.};		// degrees true north (0-360)
 		GPSAttitude attitude;
+		int32_t trackingSatellites{0};
 		int32_t visibleSatellites{0};
 
+		bool locked();
 		double horizontalAccuracy();
 		double verticalAccuracy();
+		bool hasEstimate();
+
+		std::chrono::seconds timeSinceLastUpdate();	// Returns seconds difference from last timestamp and right now.
 
 		std::string toString();
 		operator std::string();
