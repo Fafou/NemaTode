@@ -154,7 +154,7 @@ namespace nmea {
 		
 	private:
 
-		bool haslock;
+		bool haslock{false};
 		bool setlock(bool b);		//returns true if lock status **changed***, false otherwise.
 
 	public:
